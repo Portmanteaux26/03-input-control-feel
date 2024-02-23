@@ -21,14 +21,3 @@ A few examples of basic sprites with Pygame.
     * speed of each sprite is also randomised
     * sprites will reappear in a randomised position at the top of the screen
         * x-axis and y-axis detection is in place...
-* basicsprites5.py
-    * release a sprite object from another sprite object
-    * listen for a keypress, e.g. the spacebar
-    * release new sprite object for each keypress...spacebar &c.
-    * new sprite released relative to player object...
-* basicsprites6.py
-    * add collision detection
-        * collision - mob hits player & ends game
-        * collision - player hits mob and kills mob
-    * update `while` loop boolean to check for state of game
-        * looping or not
