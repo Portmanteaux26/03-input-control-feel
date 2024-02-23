@@ -6,4 +6,5 @@ This repository includes source code examples developed for COMP 323-488.
 
 * Pygame
   * control
-	* sprites
+  * sprites
+  * game example
