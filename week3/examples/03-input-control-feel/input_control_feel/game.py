@@ -368,7 +368,7 @@ class Game:
             self.player_vel.y += p.gravity * dt
 
             self.player_pos += self.player_vel * dt
-            self.player_rect.center = (int(self.player_pos.x), int(self.player_pos.y))
+            self.player_rect.center = (round(self.player_pos.x), round(self.player_pos.y))
 
             # Use the existing boundary mode for horizontal bounds.
             prev_y = self.player_rect.centery
@@ -392,7 +392,7 @@ class Game:
                 self.player_vel.scale_to_length(p.max_speed)
 
             self.player_pos += self.player_vel * dt
-            self.player_rect.center = (int(self.player_pos.x), int(self.player_pos.y))
+            self.player_rect.center = (round(self.player_pos.x), round(self.player_pos.y))
 
             self._apply_bounds_player()
 
