@@ -114,6 +114,14 @@ class Game:
                 gravity=2600.0,
                 jump_speed=860.0,
             ),
+            FeelPreset(
+                name="underwater",
+                accel=900.0,
+                max_speed=320.0,
+                friction=9.0,
+                gravity=900.0,
+                jump_speed=520.0,
+            ),
         ]
         self.preset_idx = 0
 
@@ -196,6 +204,9 @@ class Game:
             return
         if event.key == pygame.K_4:
             self.preset_idx = 3
+            return
+        if event.key == pygame.K_5:
+            self.preset_idx = 4
             return
 
         if self.state != "play":
