@@ -106,6 +106,14 @@ class Game:
                 gravity=3200.0,
                 jump_speed=820.0,
             ),
+            FeelPreset(
+                name="icy",
+                accel=1600.0,
+                max_speed=680.0,
+                friction=1.4,
+                gravity=2600.0,
+                jump_speed=860.0,
+            ),
         ]
         self.preset_idx = 0
 
@@ -185,6 +193,9 @@ class Game:
             return
         if event.key == pygame.K_3:
             self.preset_idx = 2
+            return
+        if event.key == pygame.K_4:
+            self.preset_idx = 3
             return
 
         if self.state != "play":
