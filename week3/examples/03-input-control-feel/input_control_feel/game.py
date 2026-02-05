@@ -11,12 +11,19 @@ class BoundaryMode(str, Enum):
     WRAP = "wrap"
     BOUNCE = "bounce"
 
-
 class ControlScheme(str, Enum):
     WASD = "WASD"
     ARROWS = "ARROWS"
     IJKL = "IJKL"
 
+class Action(str, Enum):
+    START = "START"
+    MOVE_LEFT = "MOVE_LEFT"
+    MOVE_RIGHT = "MOVE_RIGHT"
+    MOVE_UP = "MOVE_UP"
+    MOVE_DOWN = "MOVE_DOWN"
+    JUMP = "JUMP"
+    DASH = "DASH"
 
 @dataclass(frozen=True)
 class FeelPreset:
@@ -30,7 +37,6 @@ class FeelPreset:
     # Platformer feel
     gravity: float
     jump_speed: float
-
 
 class Game:
     fps = 60
@@ -159,7 +165,7 @@ class Game:
             self._reset(keep_state=(self.state == "title"))
             return
 
-        if self.state == "title" and event.key == pygame.K_SPACE:
+        if self.state == "title" and self._key_triggers(Action.START, event.key):
             self.state = "play"
             self._reset(keep_state=True)
             return
@@ -177,50 +183,70 @@ class Game:
         if self.state != "play":
             return
 
-        # Discrete actions
-        if event.key in {pygame.K_LSHIFT, pygame.K_RSHIFT}:
+        # Discrete actions (now via mapping)
+        if self._key_triggers(Action.DASH, event.key):
             self._try_dash()
             return
 
-        if self.platformer_mode and event.key in {pygame.K_UP, pygame.K_w, pygame.K_SPACE}:
+        if self.platformer_mode and self._key_triggers(Action.JUMP, event.key):
             self.jump_requested = True
 
-    def _scheme_keys(self) -> dict[str, set[int]]:
+    def _scheme_bindings(self) -> dict[Action, set[int]]:
+        # per-scheme movement bindings
         if self.control_scheme == ControlScheme.WASD:
             return {
-                "left": {pygame.K_a},
-                "right": {pygame.K_d},
-                "up": {pygame.K_w},
-                "down": {pygame.K_s},
+                Action.MOVE_LEFT: {pygame.K_a},
+                Action.MOVE_RIGHT: {pygame.K_d},
+                Action.MOVE_UP: {pygame.K_w},
+                Action.MOVE_DOWN: {pygame.K_s},
             }
         if self.control_scheme == ControlScheme.IJKL:
             return {
-                "left": {pygame.K_j},
-                "right": {pygame.K_l},
-                "up": {pygame.K_i},
-                "down": {pygame.K_k},
+                Action.MOVE_LEFT: {pygame.K_j},
+                Action.MOVE_RIGHT: {pygame.K_l},
+                Action.MOVE_UP: {pygame.K_i},
+                Action.MOVE_DOWN: {pygame.K_k},
             }
+        # ARROWS
         return {
-            "left": {pygame.K_LEFT},
-            "right": {pygame.K_RIGHT},
-            "up": {pygame.K_UP},
-            "down": {pygame.K_DOWN},
+            Action.MOVE_LEFT: {pygame.K_LEFT},
+            Action.MOVE_RIGHT: {pygame.K_RIGHT},
+            Action.MOVE_UP: {pygame.K_UP},
+            Action.MOVE_DOWN: {pygame.K_DOWN},
         }
+
+    def _action_keys(self, action: Action) -> set[int]:
+        # global bindings for actions (keeps your "always allow arrows" idea but via mapping)
+        always: dict[Action, set[int]] = {
+            Action.MOVE_LEFT: {pygame.K_LEFT},
+            Action.MOVE_RIGHT: {pygame.K_RIGHT},
+            Action.MOVE_UP: {pygame.K_UP},
+            Action.MOVE_DOWN: {pygame.K_DOWN},
+            Action.START: {pygame.K_SPACE},
+            Action.DASH: {pygame.K_LSHIFT, pygame.K_RSHIFT},
+            Action.JUMP: {pygame.K_SPACE, pygame.K_UP},  # platformer jump
+        }
+        scheme = self._scheme_bindings()
+        return set(scheme.get(action, set())) | set(always.get(action, set()))
+
+    def _key_triggers(self, action: Action, key: int) -> bool:
+        return key in self._action_keys(action)
+
+    def _is_action_down(self, keys: pygame.key.ScancodeWrapper, action: Action) -> bool:
+        return any(keys[k] for k in self._action_keys(action))
 
     def _read_direction(self) -> pygame.Vector2:
         keys = pygame.key.get_pressed()
-        mapping = self._scheme_keys()
 
         x = 0
         y = 0
-
-        if any(keys[k] for k in mapping["left"]):
+        if self._is_action_down(keys, Action.MOVE_LEFT):
             x -= 1
-        if any(keys[k] for k in mapping["right"]):
+        if self._is_action_down(keys, Action.MOVE_RIGHT):
             x += 1
-        if any(keys[k] for k in mapping["up"]):
+        if self._is_action_down(keys, Action.MOVE_UP):
             y -= 1
-        if any(keys[k] for k in mapping["down"]):
+        if self._is_action_down(keys, Action.MOVE_DOWN):
             y += 1
 
         direction = pygame.Vector2(x, y)
@@ -228,36 +254,16 @@ class Game:
             direction = direction.normalize()
             self.last_move_dir.update(direction)
 
-        # Always allow arrows as an alternate scheme (accessibility / convenience)
-        if direction.length_squared() == 0:
-            x2 = 0
-            y2 = 0
-            if keys[pygame.K_LEFT]:
-                x2 -= 1
-            if keys[pygame.K_RIGHT]:
-                x2 += 1
-            if keys[pygame.K_UP]:
-                y2 -= 1
-            if keys[pygame.K_DOWN]:
-                y2 += 1
-            direction2 = pygame.Vector2(x2, y2)
-            if direction2.length_squared() > 0:
-                direction2 = direction2.normalize()
-                self.last_move_dir.update(direction2)
-                return direction2
-
         return direction
 
     def _read_horizontal(self) -> float:
         keys = pygame.key.get_pressed()
-        mapping = self._scheme_keys()
 
         x = 0
-        if any(keys[k] for k in mapping["left"]) or keys[pygame.K_LEFT]:
+        if self._is_action_down(keys, Action.MOVE_LEFT):
             x -= 1
-        if any(keys[k] for k in mapping["right"]) or keys[pygame.K_RIGHT]:
+        if self._is_action_down(keys, Action.MOVE_RIGHT):
             x += 1
-
         if x != 0:
             self.last_move_dir.update(pygame.Vector2(x, 0).normalize())
 
