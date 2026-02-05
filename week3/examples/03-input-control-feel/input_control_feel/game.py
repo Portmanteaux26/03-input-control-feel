@@ -49,6 +49,9 @@ class Game:
 
     DASH_IMPULSE = 760.0
     DASH_COOLDOWN = 0.65
+    DASH_DIR_BUFFER = 0.12  # seconds
+    DASH_BOOST_TIME = 0.12  # seconds you’re allowed to exceed max_speed
+    DASH_SPEED_MULT = 1.8  # max_speed multiplier during that window
 
     def __init__(self) -> None:
         self.screen = pygame.display.set_mode((self.SCREEN_W, self.SCREEN_H))
@@ -107,7 +110,10 @@ class Game:
         self.preset_idx = 0
 
         self.dash_cooldown_left = 0.0
+        self.dash_dir_buffer_left = 0.0
+        self.dash_boost_left = 0.0
         self.last_move_dir = pygame.Vector2(1, 0)
+
 
     @property
     def preset(self) -> FeelPreset:
@@ -130,6 +136,7 @@ class Game:
         self.on_ground = True
         self.jump_requested = False
         self.dash_cooldown_left = 0.0
+        self.dash_boost_left = 0.0
         self.last_move_dir = pygame.Vector2(1, 0)
 
         if not keep_state:
@@ -253,6 +260,7 @@ class Game:
         if direction.length_squared() > 0:
             direction = direction.normalize()
             self.last_move_dir.update(direction)
+            self.dash_dir_buffer_left = self.DASH_DIR_BUFFER
 
         return direction
 
@@ -266,6 +274,7 @@ class Game:
             x += 1
         if x != 0:
             self.last_move_dir.update(pygame.Vector2(x, 0).normalize())
+            self.dash_dir_buffer_left = self.DASH_DIR_BUFFER
 
         return float(x)
 
@@ -331,14 +340,24 @@ class Game:
         if self.dash_cooldown_left > 0:
             return
 
-        dash_dir = pygame.Vector2(self.last_move_dir)
-        if dash_dir.length_squared() == 0:
-            dash_dir = pygame.Vector2(1, 0)
-        dash_dir = dash_dir.normalize()
+        # 1) Prefer currently held direction
+        if self.platformer_mode:
+            held = pygame.Vector2(self._read_horizontal(), 0)
+        else:
+            held = self._read_direction()  # already normalized in your version
 
-        # Impulse dash: a discrete action that modifies velocity once.
+        if held.length_squared() > 0:
+            dash_dir = held.normalize()
+        # 2) Otherwise allow a short buffer of last direction
+        elif self.dash_dir_buffer_left > 0 and self.last_move_dir.length_squared() > 0:
+            dash_dir = pygame.Vector2(self.last_move_dir).normalize()
+        # 3) Otherwise no dash (traditional + avoids “random” feeling)
+        else:
+            return
+
         self.player_vel += dash_dir * self.DASH_IMPULSE
         self.dash_cooldown_left = self.DASH_COOLDOWN
+        self.dash_boost_left = self.DASH_BOOST_TIME
 
     def update(self, dt: float) -> None:
         if self.state != "play":
@@ -346,6 +365,11 @@ class Game:
 
         if self.dash_cooldown_left > 0:
             self.dash_cooldown_left = max(0.0, self.dash_cooldown_left - dt)
+
+        if self.dash_boost_left > 0:
+            self.dash_boost_left = max(0.0, self.dash_boost_left - dt)
+
+        self.dash_dir_buffer_left = max(0.0, self.dash_dir_buffer_left - dt)
 
         p = self.preset
 
@@ -356,7 +380,8 @@ class Game:
             self.player_vel.x += x * p.accel * dt
             if x == 0:
                 self.player_vel.x -= self.player_vel.x * min(1.0, p.friction * dt)
-            self.player_vel.x = max(-p.max_speed, min(p.max_speed, self.player_vel.x))
+            cap = p.max_speed * (self.DASH_SPEED_MULT if self.dash_boost_left > 0 else 1.0)
+            self.player_vel.x = max(-cap, min(cap, self.player_vel.x))
 
             # Jump is a discrete action.
             if self.jump_requested and self.on_ground:
@@ -388,8 +413,9 @@ class Game:
             if direction.length_squared() == 0:
                 self.player_vel -= self.player_vel * min(1.0, p.friction * dt)
 
-            if self.player_vel.length() > p.max_speed:
-                self.player_vel.scale_to_length(p.max_speed)
+            cap = p.max_speed * (self.DASH_SPEED_MULT if self.dash_boost_left > 0 else 1.0)
+            if self.player_vel.length() > cap:
+                self.player_vel.scale_to_length(cap)
 
             self.player_pos += self.player_vel * dt
             self.player_rect.center = (round(self.player_pos.x), round(self.player_pos.y))
