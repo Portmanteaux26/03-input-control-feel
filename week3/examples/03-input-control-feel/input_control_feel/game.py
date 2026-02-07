@@ -77,6 +77,7 @@ class Game:
 
         self.on_ground = True
         self.jump_requested = False
+        self.jumps_left = 2  # total jumps available before touching ground again
 
         self.control_scheme = ControlScheme.WASD
         self.debug = False
@@ -151,6 +152,7 @@ class Game:
         self.player_rect.center = self.player_pos
         self.on_ground = True
         self.jump_requested = False
+        self.jumps_left = 2
         self.dash_cooldown_left = 0.0
         self.dash_boost_left = 0.0
         self.last_move_dir = pygame.Vector2(1, 0)
@@ -306,6 +308,7 @@ class Game:
             self.player_rect.bottom = self.playfield.bottom
             self.player_vel.y = 0
             self.on_ground = True
+            self.jumps_left = 2
 
         # Prevent leaving the top of the playfield.
         if self.player_rect.top < self.playfield.top:
@@ -405,10 +408,12 @@ class Game:
             cap = p.max_speed * (self.DASH_SPEED_MULT if self.dash_boost_left > 0 else 1.0)
             self.player_vel.x = max(-cap, min(cap, self.player_vel.x))
 
-            # Jump is a discrete action.
-            if self.jump_requested and self.on_ground:
-                self.player_vel.y = -p.jump_speed
+            # Double jump: allow 2 jumps before landing.
+            if self.jump_requested and self.jumps_left > 0:
+                jump_power = p.jump_speed * (1.0 if self.jumps_left == 2 else 0.85)
+                self.player_vel.y = -jump_power
                 self.on_ground = False
+                self.jumps_left -= 1
             self.jump_requested = False
 
             # Gravity.
