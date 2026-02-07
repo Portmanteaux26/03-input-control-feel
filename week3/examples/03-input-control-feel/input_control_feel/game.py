@@ -510,7 +510,15 @@ class Game:
         pygame.draw.rect(self.screen, (76, 86, 106), self.playfield, width=2)
 
         # Player
-        pygame.draw.rect(self.screen, (136, 192, 208), self.player_rect, border_radius=6)
+        base_color = (136, 192, 208)
+        pygame.draw.rect(self.screen, base_color, self.player_rect, border_radius=6)
+
+        # Dash flash (uses existing dash_boost_left window)
+        if getattr(self, "dash_boost_left", 0.0) > 0:
+            t = self.dash_boost_left / self.DASH_BOOST_TIME  # 1 -> 0
+            pad = int(10 * t) + 2
+            outline = self.player_rect.inflate(pad, pad)
+            pygame.draw.rect(self.screen, (220, 240, 255), outline, width=2, border_radius=6 + pad // 2)
 
         self._draw_hud()
 
